@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === Màu chủ đạo xanh nước biển + trắng === */
+:root {
+  --brand: #2563eb; /* xanh nước biển đậm */
+  --brand-light: #dbeafe; /* xanh nhạt nền */
+  --brand-dark: #1d4ed8;
+}
+
+/* === Tổng thể === */
+body {
+  @apply bg-[#f8fafc] text-blue-700;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.container-max {
+  @apply max-w-7xl mx-auto px-4;
+}
+
+/* === Typography === */
+h1, h2, h3, h4, h5, h6, p, span, label, td, th, a, div {
+  @apply text-blue-700;
+}
+
+a {
+  @apply text-blue-600 hover:text-blue-800;
+}
+
+/* === Nút === */
+.btn {
+  @apply inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-blue-300 text-blue-700 font-medium text-sm transition bg-white hover:bg-blue-50;
+}
+.btn-primary {
+  @apply bg-blue-600 text-white border-transparent hover:bg-blue-700;
+}
+.btn-ghost {
+  @apply bg-transparent text-blue-700 hover:bg-blue-50;
+}
+.btn-outline {
+  @apply border-blue-500 text-blue-600 hover:bg-blue-100;
+}
+
+/* === Input / Select === */
+.input {
+  @apply w-full rounded-xl border border-blue-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 text-blue-700;
+}
+.select {
+  @apply rounded-xl border border-blue-300 px-3 py-2 bg-white focus:ring-2 focus:ring-blue-200 text-blue-700;
+}
+
+/* === Card === */
+.card {
+  @apply bg-white rounded-2xl shadow-sm border border-blue-100 hover:shadow-md transition;
+}
+.card-header {
+  @apply px-4 py-3 border-b border-blue-100 font-semibold text-blue-700;
+}
+.card-body {
+  @apply p-4 text-blue-700;
+}
+
+/* === Badge === */
+.badge {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700;
+}
+
+/* === Bảng === */
+.table {
+  @apply w-full text-sm;
+}
+.table th {
+  @apply text-left bg-blue-100 text-blue-800;
+}
+.table th, .table td {
+  @apply px-3 py-2 border-b border-blue-100 text-blue-700;
+}
+
+/* === Sidebar === */
+.sidebar {
+  @apply bg-blue-50 border-r border-blue-100 text-blue-700;
+}
+.sidebar a {
+  @apply text-blue-700 hover:bg-blue-100;
+}
+.sidebar a.active {
+  @apply bg-blue-600 text-white font-semibold;
+}
+
+/* === Navbar & Footer === */
+.topbar {
+  @apply bg-white border-b border-blue-100 text-blue-700;
+}
+.footer {
+  @apply bg-white border-t border-blue-100 text-blue-700;
+}
+
+/* === Hiệu ứng === */
+hr {
+  @apply border-blue-100;
+}
