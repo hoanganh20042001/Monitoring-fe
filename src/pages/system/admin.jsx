@@ -7,15 +7,13 @@ import {
   FlaskConical,
   Factory,
   ClipboardCheck,
-  Layers,
-  Ruler,
-  ShieldAlert,
   Activity,
   BarChart2,
   PieChart as PieChartIcon,
   FileText,
   CalendarDays,
   UserCheck,
+  ShieldAlert,
 } from "lucide-react";
 
 import {
@@ -32,28 +30,32 @@ import {
   Cell,
 } from "recharts";
 
-import { get as getViTriLayMau } from "../../api/vi_tri_lay_mau";
-import { get as getMauThu } from "../../api/mau_thu";
-import { get as getKiemTraMau } from "../../api/kiem_tra_mau";
-import { get as getKhuVucLayMau } from "../../api/khu_vuc_lay_mau";
-import { get as getLoaiMau } from "../../api/loai_mau";
-import { get as getDonViTinh } from "../../api/don_vi_tinh";
-
-// import { get as getUsers } from "../../api/users";
-// import { get as getLogs } from "../../api/logs";
+import { get as getAdminDashboard } from "../../api/dashboard";
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
 
-  const [locations, setLocations] = useState([]);
-  const [samples, setSamples] = useState([]);
-  const [checks, setChecks] = useState([]);
-  const [areas, setAreas] = useState([]);
-  const [sampleTypes, setSampleTypes] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [logs, setLogs] = useState([]);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    totalVisits: 0,
+    todayVisits: 0,
+    totalLocations: 0,
+    totalSamples: 0,
+    totalChecks: 0,
+    totalAreas: 0,
+    totalSampleTypes: 0,
+    totalUnits: 0,
+    samplesWithResult: 0,
+    pxCount: 0,
+    hhCount: 0,
+    locationsWithCheck: 0,
+  });
+
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [objectTypeData, setObjectTypeData] = useState([]);
+  const [recentChecks, setRecentChecks] = useState([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -64,212 +66,41 @@ export default function AdminDashboard() {
     setApiError("");
 
     try {
-      const [
-        viTriResponse,
-        mauThuResponse,
-        kiemTraResponse,
-        khuVucResponse,
-        loaiMauResponse,
-        donViResponse,
-        usersResponse,
-        logsResponse,
-      ] = await Promise.all([
-        getViTriLayMau().catch(() => []),
-        getMauThu().catch(() => []),
-        getKiemTraMau().catch(() => []),
-        getKhuVucLayMau().catch(() => []),
-        getLoaiMau().catch(() => []),
-        getDonViTinh().catch(() => []),
-        getUsers().catch(() => []),
-        getLogs().catch(() => []),
-      ]);
+      const response = await getAdminDashboard();
+      console.log("Dashboard API response:", response);
+      const data = response || {};
 
-      setLocations(asArray(viTriResponse));
-      setSamples(asArray(mauThuResponse));
-      setChecks(asArray(kiemTraResponse));
-      setAreas(asArray(khuVucResponse));
-      setSampleTypes(asArray(loaiMauResponse));
-      setUnits(asArray(donViResponse));
-      setUsers(asArray(usersResponse));
-      setLogs(asArray(logsResponse));
+      setStats({
+        totalUsers: data.stats?.totalUsers || 0,
+        activeUsers: data.stats?.activeUsers || 0,
+        totalVisits: data.stats?.totalVisits || 0,
+        todayVisits: data.stats?.todayVisits || 0,
+        totalLocations: data.stats?.totalLocations || 0,
+        totalSamples: data.stats?.totalSamples || 0,
+        totalChecks: data.stats?.totalChecks || 0,
+        totalAreas: data.stats?.totalAreas || 0,
+        totalSampleTypes: data.stats?.totalSampleTypes || 0,
+        totalUnits: data.stats?.totalUnits || 0,
+        samplesWithResult: data.stats?.samplesWithResult || 0,
+        pxCount: data.stats?.pxCount || 0,
+        hhCount: data.stats?.hhCount || 0,
+        locationsWithCheck: data.stats?.locationsWithCheck || 0,
+      });
+
+      setMonthlyData(data.monthlyData || []);
+
+      setObjectTypeData(
+        (data.objectTypeData || []).filter((item) => item.value > 0)
+      );
+
+      setRecentChecks(data.recentChecks || []);
     } catch (error) {
-      console.error("Không tải được dữ liệu dashboard hóa chất:", error);
+      console.error("Không tải được dữ liệu dashboard:", error);
       setApiError("Không tải được dữ liệu thống kê dashboard.");
     } finally {
       setLoading(false);
     }
   }
-
-  const stats = useMemo(() => {
-    const totalLocations = locations.length;
-    const totalSamples = samples.length;
-    const totalChecks = checks.length;
-    const totalAreas = areas.length;
-    const totalSampleTypes = sampleTypes.length;
-    const totalUnits = units.length;
-
-    const totalUsers = users.length;
-    const totalVisits = logs.length;
-
-    const today = new Date().toISOString().slice(0, 10);
-
-    const todayVisits = logs.filter((item) => {
-      const dateValue = firstValue(
-        item,
-        ["created_at", "ngay_tao", "time", "date", "createdAt"],
-        ""
-      );
-
-      return String(dateValue).slice(0, 10) === today;
-    }).length;
-
-    const activeUsers = users.filter((item) => {
-      const status = String(
-        firstValue(item, ["status", "trang_thai", "active", "is_active"], "")
-      ).toLowerCase();
-
-      return (
-        status === "active" ||
-        status === "1" ||
-        status === "true" ||
-        status === "hoạt động" ||
-        status === "hoat dong"
-      );
-    }).length;
-
-    const samplesWithResult = samples.filter((item) => {
-      const value = firstValue(item, ["ket_qua", "gia_tri", "resultValue"], "");
-      return value !== "" && value !== null && value !== undefined;
-    }).length;
-
-    const pxCount = checks.filter((item) => {
-      const value = String(
-        firstValue(item, ["doi_tuong", "objectType", "doi_tuong_kiem_tra"], "")
-      ).toUpperCase();
-
-      return value === "PX";
-    }).length;
-
-    const hhCount = checks.filter((item) => {
-      const value = String(
-        firstValue(item, ["doi_tuong", "objectType", "doi_tuong_kiem_tra"], "")
-      ).toUpperCase();
-
-      return value === "HH";
-    }).length;
-
-    const checkedLocationIds = new Set(
-      checks
-        .map((item) =>
-          String(
-            firstValue(
-              item,
-              [
-                "vi_tri_id",
-                "vi_tri_lay_mau_id",
-                "id_vi_tri_lay_mau",
-                "locationId",
-              ],
-              ""
-            )
-          )
-        )
-        .filter(Boolean)
-    );
-
-    const locationsWithCheck = checkedLocationIds.size;
-
-    return {
-      totalUsers,
-      activeUsers,
-      totalVisits,
-      todayVisits,
-      totalLocations,
-      totalSamples,
-      totalChecks,
-      totalAreas,
-      totalSampleTypes,
-      totalUnits,
-      samplesWithResult,
-      pxCount,
-      hhCount,
-      locationsWithCheck,
-    };
-  }, [locations, samples, checks, areas, sampleTypes, units, users, logs]);
-
-  const monthlyData = useMemo(() => {
-    const months = Array.from({ length: 12 }, (_, index) => ({
-      month: `T${index + 1}`,
-      truyCap: 0,
-      kiemTra: 0,
-      mauThu: 0,
-      ketQua: 0,
-    }));
-
-    logs.forEach((item) => {
-      const monthIndex = getMonthIndex(
-        firstValue(item, ["created_at", "ngay_tao", "time", "date", "createdAt"], "")
-      );
-
-      if (monthIndex >= 0) {
-        months[monthIndex].truyCap += 1;
-      }
-    });
-
-    checks.forEach((item) => {
-      const monthIndex = getMonthIndex(
-        firstValue(
-          item,
-          ["ngay_bat_dau", "ngay_kiem_tra", "ngay_lay_mau", "created_at", "date"],
-          ""
-        )
-      );
-
-      if (monthIndex >= 0) {
-        months[monthIndex].kiemTra += 1;
-      }
-    });
-
-    samples.forEach((item) => {
-      const monthIndex = getMonthIndex(
-        firstValue(item, ["created_at", "ngay_lay_mau", "ngay_kiem_tra", "date"], "")
-      );
-
-      if (monthIndex >= 0) {
-        months[monthIndex].mauThu += 1;
-
-        const result = firstValue(item, ["ket_qua", "gia_tri", "resultValue"], "");
-        if (result !== "" && result !== null && result !== undefined) {
-          months[monthIndex].ketQua += 1;
-        }
-      }
-    });
-
-    return months;
-  }, [checks, samples, logs]);
-
-  const objectTypeData = useMemo(() => {
-    return [
-      { name: "PX - Phóng xạ", value: stats.pxCount },
-      { name: "HH - Hóa học", value: stats.hhCount },
-    ].filter((item) => item.value > 0);
-  }, [stats]);
-
-  const recentChecks = useMemo(() => {
-    return [...checks]
-      .sort((a, b) => {
-        const dateA = new Date(
-          firstValue(a, ["created_at", "ngay_bat_dau", "ngay_kiem_tra"], 0)
-        ).getTime();
-
-        const dateB = new Date(
-          firstValue(b, ["created_at", "ngay_bat_dau", "ngay_kiem_tra"], 0)
-        ).getTime();
-
-        return dateB - dateA;
-      })
-      .slice(0, 6);
-  }, [checks]);
 
   const completionRate = useMemo(() => {
     if (!stats.totalSamples) return 0;
@@ -279,6 +110,11 @@ export default function AdminDashboard() {
   const locationCheckRate = useMemo(() => {
     if (!stats.totalLocations) return 0;
     return Math.round((stats.locationsWithCheck / stats.totalLocations) * 100);
+  }, [stats]);
+
+  const activeUserRate = useMemo(() => {
+    if (!stats.totalUsers) return 0;
+    return Math.round((stats.activeUsers / stats.totalUsers) * 100);
   }, [stats]);
 
   return (
@@ -300,66 +136,17 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ====== SUMMARY CARDS ====== */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-8">
-        <Card
-          icon={<Users size={28} />}
-          label="Người dùng"
-          value={stats.totalUsers}
-          color="blue"
-        />
-
-        <Card
-          icon={<Activity size={28} />}
-          label="Lượt truy cập"
-          value={stats.totalVisits}
-          color="green"
-        />
-
-        <Card
-          icon={<CalendarDays size={28} />}
-          label="Truy cập hôm nay"
-          value={stats.todayVisits}
-          color="purple"
-        />
-
-        <Card
-          icon={<MapPin size={28} />}
-          label="Vị trí lấy mẫu"
-          value={stats.totalLocations}
-          color="blue"
-        />
-
-        <Card
-          icon={<ClipboardCheck size={28} />}
-          label="Kiểm tra mẫu"
-          value={stats.totalChecks}
-          color="green"
-        />
-
-        <Card
-          icon={<FlaskConical size={28} />}
-          label="Mẫu thử"
-          value={stats.totalSamples}
-          color="purple"
-        />
-
-        <Card
-          icon={<FileText size={28} />}
-          label="Có kết quả"
-          value={stats.samplesWithResult}
-          color="emerald"
-        />
-
-        <Card
-          icon={<Factory size={28} />}
-          label="Khu vực mẫu"
-          value={stats.totalAreas}
-          color="yellow"
-        />
+        <Card icon={<Users size={28} />} label="Người dùng" value={stats.totalUsers} color="blue" />
+        <Card icon={<Activity size={28} />} label="Lượt truy cập" value={stats.totalVisits} color="green" />
+        <Card icon={<CalendarDays size={28} />} label="Truy cập hôm nay" value={stats.todayVisits} color="purple" />
+        <Card icon={<MapPin size={28} />} label="Vị trí lấy mẫu" value={stats.totalLocations} color="blue" />
+        <Card icon={<ClipboardCheck size={28} />} label="Kiểm tra mẫu" value={stats.totalChecks} color="green" />
+        <Card icon={<FlaskConical size={28} />} label="Mẫu thử" value={stats.totalSamples} color="purple" />
+        <Card icon={<FileText size={28} />} label="Có kết quả" value={stats.samplesWithResult} color="emerald" />
+        <Card icon={<Factory size={28} />} label="Khu vực mẫu" value={stats.totalAreas} color="yellow" />
       </div>
 
-      {/* ====== DETAIL CARDS ====== */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <ProgressCard
           title="Tỷ lệ mẫu đã có kết quả"
@@ -380,17 +167,12 @@ export default function AdminDashboard() {
         <ProgressCard
           title="Người dùng hoạt động"
           value={stats.activeUsers}
-          percent={
-            stats.totalUsers
-              ? Math.round((stats.activeUsers / stats.totalUsers) * 100)
-              : 0
-          }
+          percent={activeUserRate}
           icon={<UserCheck size={22} />}
           helper={`${stats.activeUsers}/${stats.totalUsers} tài khoản đang hoạt động`}
         />
       </div>
 
-      {/* ====== CHARTS ====== */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="card p-6 xl:col-span-2">
           <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
@@ -406,38 +188,10 @@ export default function AdminDashboard() {
                 <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Legend />
-
-                <Line
-                  type="monotone"
-                  dataKey="truyCap"
-                  name="Lượt truy cập"
-                  stroke="#9333ea"
-                  strokeWidth={3}
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="kiemTra"
-                  name="Kiểm tra mẫu"
-                  stroke="#2563eb"
-                  strokeWidth={3}
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="mauThu"
-                  name="Mẫu thử"
-                  stroke="#16a34a"
-                  strokeWidth={3}
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="ketQua"
-                  name="Có kết quả"
-                  stroke="#dc2626"
-                  strokeWidth={3}
-                />
+                <Line type="monotone" dataKey="truyCap" name="Lượt truy cập" stroke="#9333ea" strokeWidth={3} />
+                <Line type="monotone" dataKey="kiemTra" name="Kiểm tra mẫu" stroke="#2563eb" strokeWidth={3} />
+                <Line type="monotone" dataKey="mauThu" name="Mẫu thử" stroke="#16a34a" strokeWidth={3} />
+                <Line type="monotone" dataKey="ketQua" name="Có kết quả" stroke="#dc2626" strokeWidth={3} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -482,7 +236,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* ====== STAT BLOCKS ====== */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatBlock
           title="Thống kê hệ thống"
@@ -531,7 +284,6 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* ====== RECENT CHECKS ====== */}
       <div className="card p-6">
         <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
           <CalendarDays size={20} />
@@ -558,49 +310,22 @@ export default function AdminDashboard() {
                     <td className="px-4 py-3 font-semibold">
                       {firstValue(item, ["ma_mau_khach_hang", "ma_mau", "code"], "—")}
                     </td>
-
                     <td className="px-4 py-3">
-                      {firstValue(
-                        item,
-                        ["loai_mau_so_hieu", "loai_mau", "ten_loai_mau"],
-                        "—"
-                      )}
+                      {firstValue(item, ["loai_mau_so_hieu", "loai_mau", "ten_loai_mau"], "—")}
                     </td>
-
                     <td className="px-4 py-3">
-                      {firstValue(
-                        item,
-                        ["khu_vuc_lay_mau", "ten_khu_vuc", "khu_vuc"],
-                        "—"
-                      )}
+                      {firstValue(item, ["khu_vuc_lay_mau", "ten_khu_vuc", "khu_vuc"], "—")}
                     </td>
-
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                        {firstValue(
-                          item,
-                          ["doi_tuong", "objectType", "doi_tuong_kiem_tra"],
-                          "—"
-                        )}
+                        {firstValue(item, ["doi_tuong", "objectType", "doi_tuong_kiem_tra"], "—")}
                       </span>
                     </td>
-
                     <td className="px-4 py-3">
-                      {formatDate(
-                        firstValue(
-                          item,
-                          ["ngay_bat_dau", "ngay_kiem_tra", "created_at"],
-                          ""
-                        )
-                      )}
+                      {formatDate(firstValue(item, ["ngay_bat_dau", "ngay_kiem_tra", "created_at"], ""))}
                     </td>
-
                     <td className="px-4 py-3">
-                      {firstValue(
-                        item,
-                        ["nguoi_thu_nghiem", "tester", "nguoi_lay_mau"],
-                        "—"
-                      )}
+                      {firstValue(item, ["nguoi_thu_nghiem", "tester", "nguoi_lay_mau"], "—")}
                     </td>
                   </tr>
                 ))}
@@ -617,33 +342,6 @@ export default function AdminDashboard() {
   );
 }
 
-/* ================= HELPER FUNCTIONS ================= */
-
-function unwrapApiData(response) {
-  return (
-    response?.data?.data ??
-    response?.data?.items ??
-    response?.data?.records ??
-    response?.data ??
-    response?.items ??
-    response?.records ??
-    response?.result ??
-    response
-  );
-}
-
-function asArray(response) {
-  const source = unwrapApiData(response);
-
-  if (Array.isArray(source)) return source;
-  if (Array.isArray(source?.data)) return source.data;
-  if (Array.isArray(source?.items)) return source.items;
-  if (Array.isArray(source?.records)) return source.records;
-  if (Array.isArray(source?.results)) return source.results;
-
-  return [];
-}
-
 function firstValue(item, keys, fallback = "") {
   for (const key of keys) {
     const value = item?.[key];
@@ -654,18 +352,6 @@ function firstValue(item, keys, fallback = "") {
   }
 
   return fallback;
-}
-
-function getMonthIndex(value) {
-  if (!value) return -1;
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return -1;
-  }
-
-  return date.getMonth();
 }
 
 function formatDate(value) {
@@ -679,8 +365,6 @@ function formatDate(value) {
 
   return date.toLocaleDateString("vi-VN");
 }
-
-/* ================= COMPONENT: SUMMARY CARD ================= */
 
 function Card({ icon, label, value, color }) {
   const colors = {
@@ -709,8 +393,6 @@ function Card({ icon, label, value, color }) {
   );
 }
 
-/* ================= COMPONENT: PROGRESS CARD ================= */
-
 function ProgressCard({ title, value, percent, icon, helper }) {
   const safePercent = Math.max(0, Math.min(100, Number(percent || 0)));
 
@@ -736,8 +418,6 @@ function ProgressCard({ title, value, percent, icon, helper }) {
     </div>
   );
 }
-
-/* ================= COMPONENT: STAT BLOCK ================= */
 
 function StatBlock({ title, icon, items }) {
   return (

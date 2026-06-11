@@ -10,9 +10,9 @@ import AuthProvider from "./context/AuthContext.jsx";
 import Home from "./pages/Home.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 
-import TienDoCongViecPage from "./pages/progress";
+// import TienDoCongViecPage from "./pages/progress";
 import { Users, Loai_mau, Logs, Admin, Khu_vuc, Don_vi_tinh } from "./pages/system";
-import TaskList from "./pages/task";
+// import TaskList from "./pages/task";
 
 /* ================= USER / PUBLIC ================= */
 function UserLayout() {
@@ -30,14 +30,14 @@ function UserLayout() {
           }
         />
 
-        <Route
+        {/* <Route
           path="/tasks"
           element={
             <Protected>
               <TaskList />
             </Protected>
           }
-        />
+        /> */}
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

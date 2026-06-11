@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PageHeader from "../../components/PageHeader.jsx";
 import Table from "../../components/Table.jsx";
 import Modal from "../../components/Modal.jsx";
@@ -19,22 +19,32 @@ import {
   create as createUser,
   update as updateUser,
   remove as deleteUser,
-} from "../../api/users.js";
-
-import { get as getRoles } from "../../api/roles.js";
+  changePassBySa,
+} from "../../api/nguoi_dung.js";
 
 const EMPTY_USER = {
   id: "",
-  username: "",
-  name: "",
-  role_id: "",
-  status: 1,
-  password: "12345678",
+  ho_ten: "",
+  ten_dang_nhap: "",
+  quyen: "nguoi_xem",
+  so_dien_thoai: "",
+  trang_thai: "hoat_dong",
+  password: "123456",
+};
+
+const QUYEN_LABEL = {
+  admin: "Quản trị",
+  nhap_lieu: "Nhập liệu",
+  nguoi_xem: "Người xem",
+};
+
+const TRANG_THAI_LABEL = {
+  hoat_dong: "Hoạt động",
+  tam_khoa: "Tạm khóa",
 };
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
-  const [roles, setRoles] = useState([]);
 
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -45,9 +55,10 @@ export default function UserManagement() {
 
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordData, setPasswordData] = useState({
-    new_pass: "",
+    new_password: "",
     confirm: "",
   });
+
   const [showPwNew, setShowPwNew] = useState(false);
   const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [showPasswordAdd, setShowPasswordAdd] = useState(false);
@@ -57,91 +68,176 @@ export default function UserManagement() {
 
   const [notify, setNotify] = useState(null);
 
-  // LOAD USERS + ROLES
   useEffect(() => {
     loadUsers();
-    loadRoles();
   }, []);
 
   async function loadUsers() {
     try {
       const res = await getUsers();
-      const list = (res.data || []).map((u, idx) => ({
+      console.log("API response for users:", res);
+      const source = res?.data?.data || res?.data || [];
+
+      const list = source.map((u, idx) => ({
         ...u,
         stt: idx + 1,
-        status: u.status == 1 || u.status === true ? 1 : 0,
       }));
+
       setUsers(list);
     } catch (err) {
-      setNotify({ type: "error", message: err.message });
+      setNotify({
+        type: "error",
+        message: err?.response?.data?.message || err.message,
+      });
     }
   }
 
-  async function loadRoles() {
-    try {
-      const res = await getRoles();
-      setRoles(res.data || []);
-    } catch (err) {
-      console.error("Lỗi load roles:", err);
-    }
-  }
-
-  // FILTER
   const filtered = useMemo(() => {
+    const keyword = query.toLowerCase();
+
     return users.filter(
       (u) =>
-        u.username?.toLowerCase().includes(query.toLowerCase()) ||
-        u.name?.toLowerCase().includes(query.toLowerCase())
+        u.ten_dang_nhap?.toLowerCase().includes(keyword) ||
+        u.ho_ten?.toLowerCase().includes(keyword) ||
+        u.so_dien_thoai?.toLowerCase().includes(keyword) ||
+        u.quyen?.toLowerCase().includes(keyword)
     );
   }, [query, users]);
+
+  const totalPage = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
 
   const paged = useMemo(() => {
     const start = (page - 1) * rowsPerPage;
     return filtered.slice(start, start + rowsPerPage);
   }, [page, rowsPerPage, filtered]);
 
-  // SAVE USER
   async function saveUser() {
     try {
+      if (!editing.ho_ten?.trim()) {
+        return setNotify({
+          type: "error",
+          message: "Vui lòng nhập họ tên!",
+        });
+      }
+
+      if (!editing.ten_dang_nhap?.trim()) {
+        return setNotify({
+          type: "error",
+          message: "Vui lòng nhập tên đăng nhập!",
+        });
+      }
+
       if (editing.id) {
-        const payload = { ...editing };
-        delete payload.password;
+        const payload = {
+          ho_ten: editing.ho_ten,
+          ten_dang_nhap: editing.ten_dang_nhap,
+          quyen: editing.quyen,
+          so_dien_thoai: editing.so_dien_thoai,
+          trang_thai: editing.trang_thai,
+        };
+
         await updateUser(editing.id, payload);
-        setNotify({ type: "success", message: "Cập nhật người dùng thành công!" });
+
+        setNotify({
+          type: "success",
+          message: "Cập nhật người dùng thành công!",
+        });
       } else {
-        if (!editing.password)
+        if (!editing.password?.trim()) {
           return setNotify({
             type: "error",
-            message: "Mật khẩu không được để trống",
+            message: "Mật khẩu không được để trống!",
           });
-        const payload = { ...editing };
-        delete payload.id;
+        }
+
+        const payload = {
+          ho_ten: editing.ho_ten,
+          ten_dang_nhap: editing.ten_dang_nhap,
+          quyen: editing.quyen,
+          so_dien_thoai: editing.so_dien_thoai,
+          trang_thai: editing.trang_thai,
+          password: editing.password,
+        };
+
         await createUser(payload);
-        setNotify({ type: "success", message: "Thêm người dùng mới thành công!" });
+
+        setNotify({
+          type: "success",
+          message: "Thêm người dùng mới thành công!",
+        });
       }
 
       setEditorOpen(false);
+      setEditing(EMPTY_USER);
       loadUsers();
     } catch (err) {
-      setNotify({ type: "error", message: err.message });
+      setNotify({
+        type: "error",
+        message: err?.response?.data || err.message,
+      });
     }
   }
 
-  // DELETE USER
   async function confirmDeleteFn() {
     try {
       await deleteUser(pendingDelete.id);
-      setNotify({ type: "success", message: "Đã xóa người dùng" });
+
+      setNotify({
+        type: "success",
+        message: "Đã xóa người dùng!",
+      });
+
       setConfirmOpen(false);
+      setPendingDelete(null);
       loadUsers();
     } catch (err) {
-      setNotify({ type: "error", message: err.message });
+      setNotify({
+        type: "error",
+        message: err?.response?.data || err.message,
+      });
+    }
+  }
+
+  async function savePassword() {
+    try {
+      if (!passwordData.new_password?.trim()) {
+        return setNotify({
+          type: "error",
+          message: "Vui lòng nhập mật khẩu mới!",
+        });
+      }
+
+      if (passwordData.new_password !== passwordData.confirm) {
+        return setNotify({
+          type: "error",
+          message: "Mật khẩu xác nhận không khớp!",
+        });
+      }
+
+      await changePassBySa(editing.id, {
+        new_password: passwordData.new_password,
+      });
+
+      setNotify({
+        type: "success",
+        message: "Đổi mật khẩu thành công!",
+      });
+
+      setPasswordOpen(false);
+      setPasswordData({
+        new_password: "",
+        confirm: "",
+      });
+    } catch (err) {
+      setNotify({
+        type: "error",
+        message: err?.response?.data?.message || err.message,
+      });
     }
   }
 
   return (
     <div className="space-y-4">
-      {/* ===== HEADER ===== */}
       <div className="text-green-700">
         <PageHeader
           title={
@@ -157,15 +253,18 @@ export default function UserManagement() {
         />
       </div>
 
-      {/* ===== SEARCH + ADD ===== */}
-      <div className="bg-white p-4 rounded-lg shadow border flex justify-between items-center">
+      <div className="flex items-center justify-between rounded-lg border bg-white p-4 shadow">
         <div className="flex items-center gap-2">
           <Search size={18} className="text-green-700" />
+
           <input
-            placeholder="Tìm theo tên hoặc tên đăng nhập..."
+            placeholder="Tìm theo họ tên, tên đăng nhập, số điện thoại..."
             className="input w-96"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
 
@@ -182,27 +281,47 @@ export default function UserManagement() {
         </button>
       </div>
 
-      {/* ===== TABLE ===== */}
       <Table
         columns={[
-          { title: "STT", key: "stt", className: "w-16" },
-          { title: "Tên đăng nhập", key: "username" },
-          { title: "Họ tên", key: "fullname" },
-          // {
-          //   title: "Quyền",
-          //   key: "role",
-          //   render: (value) => value?.name || "—",
-          // },
+          {
+            title: "STT",
+            key: "stt",
+            className: "w-16",
+          },
+          {
+            title: "Tên đăng nhập",
+            key: "ten_dang_nhap",
+          },
+          {
+            title: "Họ tên",
+            key: "ho_ten",
+          },
+          {
+            title: "Số điện thoại",
+            key: "so_dien_thoai",
+            render: (value) => value || "—",
+          },
+          {
+            title: "Quyền",
+            key: "quyen",
+            render: (value) => (
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                {QUYEN_LABEL[value] || value || "—"}
+              </span>
+            ),
+          },
           {
             title: "Trạng thái",
-            key: "activated",
+            key: "trang_thai",
             render: (value) => (
               <span
                 className={
-                  value == 0 ? "text-green-700 font-medium" : "text-gray-500"
+                  value === "hoat_dong"
+                    ? "font-semibold text-green-700"
+                    : "font-semibold text-red-600"
                 }
               >
-                {value == 0 ? "Hoạt động" : "Không hoạt động"}
+                {TRANG_THAI_LABEL[value] || value || "—"}
               </span>
             ),
           },
@@ -215,6 +334,10 @@ export default function UserManagement() {
               title="Đổi mật khẩu"
               onClick={() => {
                 setEditing(row);
+                setPasswordData({
+                  new_password: "",
+                  confirm: "",
+                });
                 setPasswordOpen(true);
               }}
             >
@@ -225,7 +348,15 @@ export default function UserManagement() {
               className="btn-icon"
               title="Chỉnh sửa"
               onClick={() => {
-                setEditing({ ...row });
+                setEditing({
+                  id: row.id,
+                  ho_ten: row.ho_ten || "",
+                  ten_dang_nhap: row.ten_dang_nhap || "",
+                  quyen: row.quyen || "nguoi_xem",
+                  so_dien_thoai: row.so_dien_thoai || "",
+                  trang_thai: row.trang_thai || "hoat_dong",
+                  password: "",
+                });
                 setEditorOpen(true);
               }}
             >
@@ -246,28 +377,30 @@ export default function UserManagement() {
         )}
       />
 
-      {/* ===== PAGINATION ===== */}
-      <div className="flex justify-between items-center text-sm">
+      <div className="flex items-center justify-between text-sm">
         <span>
-          Trang {page} / {Math.ceil(filtered.length / rowsPerPage)}
+          Trang {page} / {totalPage} — Tổng {filtered.length} người dùng
         </span>
+
         <div className="flex gap-2">
-          <button className="btn" onClick={() => page > 1 && setPage(page - 1)}>
-            {"<"}
-          </button>
           <button
             className="btn"
-            onClick={() =>
-              page < Math.ceil(filtered.length / rowsPerPage) &&
-              setPage(page + 1)
-            }
+            disabled={page <= 1}
+            onClick={() => page > 1 && setPage(page - 1)}
+          >
+            {"<"}
+          </button>
+
+          <button
+            className="btn"
+            disabled={page >= totalPage}
+            onClick={() => page < totalPage && setPage(page + 1)}
           >
             {">"}
           </button>
         </div>
       </div>
 
-      {/* ===== ADD / EDIT MODAL ===== */}
       <Modal
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
@@ -280,6 +413,7 @@ export default function UserManagement() {
             <button className="btn" onClick={() => setEditorOpen(false)}>
               Hủy
             </button>
+
             <button className="btn" onClick={saveUser}>
               Lưu
             </button>
@@ -291,11 +425,15 @@ export default function UserManagement() {
             <label className="text-sm font-medium text-green-700">
               Họ tên *
             </label>
+
             <input
               className="input w-full"
-              value={editing.name}
+              value={editing.ho_ten}
               onChange={(e) =>
-                setEditing({ ...editing, name: e.target.value })
+                setEditing({
+                  ...editing,
+                  ho_ten: e.target.value,
+                })
               }
             />
           </div>
@@ -304,11 +442,32 @@ export default function UserManagement() {
             <label className="text-sm font-medium text-green-700">
               Tên đăng nhập *
             </label>
+
             <input
               className="input w-full"
-              value={editing.username}
+              value={editing.ten_dang_nhap}
               onChange={(e) =>
-                setEditing({ ...editing, username: e.target.value })
+                setEditing({
+                  ...editing,
+                  ten_dang_nhap: e.target.value,
+                })
+              }
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-green-700">
+              Số điện thoại
+            </label>
+
+            <input
+              className="input w-full"
+              value={editing.so_dien_thoai || ""}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  so_dien_thoai: e.target.value,
+                })
               }
             />
           </div>
@@ -317,19 +476,40 @@ export default function UserManagement() {
             <label className="text-sm font-medium text-green-700">
               Quyền *
             </label>
+
             <select
               className="select w-full"
-              value={editing.role_id}
+              value={editing.quyen}
               onChange={(e) =>
-                setEditing({ ...editing, role_id: e.target.value })
+                setEditing({
+                  ...editing,
+                  quyen: e.target.value,
+                })
               }
             >
-              <option value="">-- Chọn quyền --</option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
+              <option value="admin">Quản trị</option>
+              <option value="nhap_lieu">Nhập liệu</option>
+              <option value="nguoi_xem">Người xem</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-green-700">
+              Trạng thái *
+            </label>
+
+            <select
+              className="select w-full"
+              value={editing.trang_thai}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  trang_thai: e.target.value,
+                })
+              }
+            >
+              <option value="hoat_dong">Hoạt động</option>
+              <option value="tam_khoa">Tạm khóa</option>
             </select>
           </div>
         </div>
@@ -339,16 +519,22 @@ export default function UserManagement() {
             <label className="text-sm font-medium text-green-700">
               Mật khẩu đăng nhập *
             </label>
+
             <div className="relative">
               <input
                 type={showPasswordAdd ? "text" : "password"}
                 className="input w-full pr-10"
                 value={editing.password}
                 onChange={(e) =>
-                  setEditing({ ...editing, password: e.target.value })
+                  setEditing({
+                    ...editing,
+                    password: e.target.value,
+                  })
                 }
               />
+
               <button
+                type="button"
                 onClick={() => setShowPasswordAdd(!showPasswordAdd)}
                 className="absolute right-3 top-3"
               >
@@ -359,7 +545,82 @@ export default function UserManagement() {
         )}
       </Modal>
 
-      {/* ===== DELETE CONFIRM ===== */}
+      <Modal
+        open={passwordOpen}
+        onClose={() => setPasswordOpen(false)}
+        className="max-w-[450px]"
+        title={`Đổi mật khẩu: ${editing?.ho_ten || ""}`}
+        footer={
+          <>
+            <button className="btn" onClick={() => setPasswordOpen(false)}>
+              Hủy
+            </button>
+
+            <button className="btn" onClick={savePassword}>
+              Lưu mật khẩu
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-green-700">
+              Mật khẩu mới *
+            </label>
+
+            <div className="relative">
+              <input
+                type={showPwNew ? "text" : "password"}
+                className="input w-full pr-10"
+                value={passwordData.new_password}
+                onChange={(e) =>
+                  setPasswordData({
+                    ...passwordData,
+                    new_password: e.target.value,
+                  })
+                }
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPwNew(!showPwNew)}
+                className="absolute right-3 top-3"
+              >
+                {showPwNew ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-green-700">
+              Xác nhận mật khẩu *
+            </label>
+
+            <div className="relative">
+              <input
+                type={showPwConfirm ? "text" : "password"}
+                className="input w-full pr-10"
+                value={passwordData.confirm}
+                onChange={(e) =>
+                  setPasswordData({
+                    ...passwordData,
+                    confirm: e.target.value,
+                  })
+                }
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPwConfirm(!showPwConfirm)}
+                className="absolute right-3 top-3"
+              >
+                {showPwConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
       <Modal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -370,6 +631,7 @@ export default function UserManagement() {
             <button className="btn" onClick={() => setConfirmOpen(false)}>
               Hủy
             </button>
+
             <button className="btn btn-danger" onClick={confirmDeleteFn}>
               Xóa
             </button>
@@ -378,11 +640,10 @@ export default function UserManagement() {
       >
         <p>
           Bạn có chắc muốn xóa người dùng:{" "}
-          <b className="text-green-700">{pendingDelete?.name}</b>?
+          <b className="text-green-700">{pendingDelete?.ho_ten}</b>?
         </p>
       </Modal>
 
-      {/* ===== NOTIFICATION ===== */}
       {notify && (
         <Notification
           type={notify.type}

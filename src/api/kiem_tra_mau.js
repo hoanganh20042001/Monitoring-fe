@@ -6,9 +6,6 @@ export const get = async () => {
 };
 
 
-export const getByUnitId = async (id) => {
-  return await fetchWithAuth(`/kiem_tra_mau/${id}`, { method: "GET" });
-};
 
 
 export const getById = async (id) => {

@@ -1,156 +1,197 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Table from "../../components/Table";
 import Modal from "../../components/Modal";
 import Notification from "../../components/Notification";
+import PageHeader from "../../components/PageHeader";
 import { Eye, Search, RefreshCcw } from "lucide-react";
 
-// ✅ import api từ service bạn đã tạo
-// import { get as getMissions } from "../../api/missions";
+import {
+  get as getHistory,
+  getById,
+} from "../../api/lich_su_nguoi_dung";
 
-/* =====================
-   MAIN COMPONENT
-===================== */
-export default function MissionHistory() {
+export default function UserHistory() {
   const [data, setData] = useState([]);
-  const [total, setTotal] = useState(0);
-
   const [query, setQuery] = useState("");
+
   const [selected, setSelected] = useState(null);
   const [openDetail, setOpenDetail] = useState(false);
 
   const [notify, setNotify] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // server-side pagination
   const [page, setPage] = useState(1);
   const size = 10;
-  const totalPages = Math.ceil(total / size) || 1;
 
-  /* =====================
-        FETCH DATA
-  ===================== */
-  const fetchData = async ({ pageParam = page, queryParam = query } = {}) => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await getMissions({
-        page: pageParam,
-        size,
-        search_text: queryParam,
-      });
 
-      // res thường có dạng: { total, data }
-      setData(res?.data || []);
-      setTotal(res?.total || 0);
+      const res = await getHistory();
+      const rows = res?.data || [];
+
+      setData(rows);
     } catch (err) {
       setNotify({
         type: "error",
-        message: "Không thể tải lịch sử nhiệm vụ. Vui lòng thử lại.",
+        message: "Không thể tải lịch sử người dùng.",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  /* =====================
-        LOAD WHEN PAGE CHANGES
-  ===================== */
+  const openDetailModal = async (id) => {
+    try {
+      setLoading(true);
+
+      const res = await getById(id);
+      setSelected(res);
+      setOpenDetail(true);
+    } catch (err) {
+      setNotify({
+        type: "error",
+        message: "Không thể tải chi tiết lịch sử.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line
-  }, [page]);
+  }, []);
 
-  /* =====================
-        SEARCH (DEBOUNCE)
-  ===================== */
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(1);
-      fetchData({ pageParam: 1, queryParam: query });
-    }, 500);
+  const filtered = useMemo(() => {
+    const keyword = query.toLowerCase();
 
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line
-  }, [query]);
+    return data.filter((item) => {
+      return (
+        item.ten_dang_nhap?.toLowerCase().includes(keyword) ||
+        item.ho_ten?.toLowerCase().includes(keyword) ||
+        item.hanh_dong?.toLowerCase().includes(keyword) ||
+        item.ten_bang?.toLowerCase().includes(keyword) ||
+        item.noi_dung?.toLowerCase().includes(keyword) ||
+        item.ip_address?.toLowerCase().includes(keyword)
+      );
+    });
+  }, [data, query]);
 
-  /* =====================
-        COLUMNS
-  ===================== */
+  const totalPages = Math.ceil(filtered.length / size) || 1;
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * size;
+
+    return filtered.slice(start, start + size).map((item, idx) => ({
+      ...item,
+      stt: start + idx + 1,
+    }));
+  }, [filtered, page]);
+
   const columns = [
-    { key: "stt", title: "STT", className: "w-14" },
-    { key: "name", title: "Tên nhiệm vụ" },
-    { key: "scenario_name", title: "Scenario" },
-    { key: "base_dosage_name", title: "Liều cơ bản" },
-    { key: "risk_coefficient_description", title: "Hệ số rủi ro" },
-    { key: "activity_coefficient_description", title: "Hệ số hoạt động" },
-    { key: "safety_coefficient_description", title: "Hệ số an toàn" },
-    { key: "createdAt", title: "Thời gian cấp phát", className: "whitespace-nowrap" },
-    { key: "updatedAt", title: "Cập nhật lần cuối", className: "whitespace-nowrap" },
-    // { key: "id", title: "ID nhiệm vụ", className: "whitespace-nowrap" },
-    // { key: "actions", title: "Hành động", className: "w-20" },
-    // { key: "status", title: "Trạng thái", className: "w-24" },
-    // { key: "notes", title: "Ghi chú" },
-    { key: "created_by", title: "Người cấp phát" },
+    {
+      key: "stt",
+      title: "STT",
+      className: "w-14",
+    },
+    {
+      key: "ten_dang_nhap",
+      title: "Tên đăng nhập",
+    },
+    {
+      key: "ho_ten",
+      title: "Họ tên",
+    },
+    {
+      key: "hanh_dong",
+      title: "Hành động",
+      render: (value) => (
+        <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700">
+          {value || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "ten_bang",
+      title: "Tên bảng",
+      render: (value) => value || "—",
+    },
+    {
+      key: "ban_ghi_id",
+      title: "ID bản ghi",
+      render: (value) => value || "—",
+    },
+    {
+      key: "ip_address",
+      title: "IP",
+      render: (value) => value || "—",
+    },
+    {
+      key: "thoi_gian",
+      title: "Thời gian",
+      className: "whitespace-nowrap",
+      render: (value) => formatDateTime(value),
+    },
   ];
 
   return (
-    <div className="p-6 space-y-4">
-      {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-green-700">
-            Lịch sử cấp phát nhiệm vụ
-          </h1>
-          <p className="text-green-600">
-            Theo dõi & tra cứu nhiệm vụ theo scenario và các hệ số
-          </p>
+    <div className="space-y-4 p-6">
+      <PageHeader
+        title={
+          <span className="font-bold text-green-700">
+            Lịch sử người dùng
+          </span>
+        }
+        subtitle={
+          <span className="text-green-600">
+            Theo dõi thao tác đăng nhập và sửa dữ liệu trong hệ thống
+          </span>
+        }
+      />
+
+      <div className="flex items-center justify-between rounded-lg border bg-white p-4 shadow">
+        <div className="flex items-center gap-2">
+          <Search size={18} className="text-green-700" />
+
+          <input
+            className="input w-[420px]"
+            placeholder="Tìm theo tài khoản, họ tên, hành động, bảng, IP..."
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+          />
         </div>
 
         <button
           className="btn flex items-center gap-2"
           disabled={loading}
-          onClick={() => fetchData()}
+          onClick={fetchData}
         >
           <RefreshCcw size={16} />
           {loading ? "Đang tải..." : "Tải lại"}
         </button>
       </div>
 
-      {/* ===== SEARCH ===== */}
-      <div className="bg-white p-4 rounded-lg border shadow flex items-center gap-2">
-        <Search size={18} className="text-green-700" />
-        <input
-          className="input w-[450px]"
-          placeholder="Tìm theo tên nhiệm vụ, scenario, hệ số..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-
-      {/* ===== TABLE ===== */}
       <Table
         columns={columns}
         loading={loading}
-        data={data.map((i, idx) => ({
-          ...i,
-          stt: (page - 1) * size + idx + 1,
-        }))}
+        data={paged}
         renderActions={(row) => (
           <button
             className="text-green-700 hover:text-green-900"
-            onClick={() => {
-              setSelected(row);
-              setOpenDetail(true);
-            }}
+            title="Xem chi tiết"
+            onClick={() => openDetailModal(row.id)}
           >
             <Eye size={18} />
           </button>
         )}
       />
 
-      {/* ===== PAGINATION ===== */}
-      <div className="flex justify-between items-center text-sm">
+      <div className="flex items-center justify-between text-sm">
         <span>
-          Tổng: {total} bản ghi — Trang {page} / {totalPages}
+          Tổng: {filtered.length} bản ghi — Trang {page} / {totalPages}
         </span>
 
         <div className="flex gap-2">
@@ -172,12 +213,11 @@ export default function MissionHistory() {
         </div>
       </div>
 
-      {/* ===== DETAIL MODAL ===== */}
       <Modal
         open={openDetail}
         onClose={() => setOpenDetail(false)}
-        title="Chi tiết nhiệm vụ"
-        className="max-w-[650px]"
+        title="Chi tiết lịch sử người dùng"
+        className="max-w-[800px]"
         footer={
           <button className="btn" onClick={() => setOpenDetail(false)}>
             Đóng
@@ -185,24 +225,31 @@ export default function MissionHistory() {
         }
       >
         {selected && (
-          <div className="space-y-3 text-sm">
-            <div>
-              <b>Tên nhiệm vụ:</b> {selected.name}
+          <div className="space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <InfoBox label="ID lịch sử" value={selected.id} />
+              <InfoBox label="ID người dùng" value={selected.nguoi_dung_id} />
+              <InfoBox label="Tên đăng nhập" value={selected.ten_dang_nhap} />
+              <InfoBox label="Họ tên" value={selected.ho_ten} />
+              <InfoBox label="Hành động" value={selected.hanh_dong} />
+              <InfoBox label="Tên bảng" value={selected.ten_bang} />
+              <InfoBox label="ID bản ghi" value={selected.ban_ghi_id} />
+              <InfoBox label="IP" value={selected.ip_address} />
+              <InfoBox
+                label="Thời gian"
+                value={formatDateTime(selected.thoi_gian)}
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <InfoBox label="Scenario" value={selected.scenario_name} />
-              <InfoBox label="Liều cơ bản" value={selected.base_dosage_name} />
-              <InfoBox label="Hệ số rủi ro" value={selected.risk_coefficient_name} />
-              <InfoBox label="Hệ số hoạt động" value={selected.activity_coefficient_name} />
-              <InfoBox label="Hệ số an toàn" value={selected.safety_coefficient_name} />
-              <InfoBox label="ID nhiệm vụ" value={selected.id} />
-            </div>
+            <InfoArea label="Nội dung" value={selected.noi_dung} />
+            <InfoArea label="User Agent" value={selected.user_agent} />
+
+            <JsonBox label="Dữ liệu cũ" value={selected.du_lieu_cu} />
+            <JsonBox label="Dữ liệu mới" value={selected.du_lieu_moi} />
           </div>
         )}
       </Modal>
 
-      {/* ===== NOTIFICATION ===== */}
       {notify && (
         <Notification
           type={notify.type}
@@ -214,14 +261,58 @@ export default function MissionHistory() {
   );
 }
 
-/* =====================
-   SMALL UI COMPONENT
-===================== */
 function InfoBox({ label, value }) {
   return (
-    <div className="p-3 border rounded-lg bg-gray-50">
-      <div className="text-gray-500 text-xs">{label}</div>
+    <div className="rounded-lg border bg-gray-50 p-3">
+      <div className="text-xs text-gray-500">{label}</div>
       <div className="font-semibold">{value || "—"}</div>
     </div>
   );
+}
+
+function InfoArea({ label, value }) {
+  return (
+    <div className="rounded-lg border bg-gray-50 p-3">
+      <div className="mb-1 text-xs text-gray-500">{label}</div>
+      <div className="whitespace-pre-wrap break-words font-medium">
+        {value || "—"}
+      </div>
+    </div>
+  );
+}
+
+function JsonBox({ label, value }) {
+  let content = "—";
+
+  if (value) {
+    try {
+      content =
+        typeof value === "string"
+          ? JSON.stringify(JSON.parse(value), null, 2)
+          : JSON.stringify(value, null, 2);
+    } catch {
+      content = String(value);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border bg-gray-900 p-3 text-white">
+      <div className="mb-2 text-xs text-gray-300">{label}</div>
+      <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs">
+        {content}
+      </pre>
+    </div>
+  );
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString("vi-VN");
 }
